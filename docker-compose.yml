@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16
+    container_name: motorcycles_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: motorcycles_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: app
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_port_listener 5672"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: Rent.Motorcycle.API/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Docker"
+      ASPNETCORE_URLS: "http://0.0.0.0:8080"
+
+      ConnectionStrings__Postgres: "Host=db;Port=5432;Database=motorcycles_db;Username=postgres;Password=postgres"
+
+      RabbitMq__Host: "rabbitmq"
+      RabbitMq__Port: "5672"
+      RabbitMq__VirtualHost: "/"
+      RabbitMq__User: "app"
+      RabbitMq__Password: "app"
+      RabbitMq__Exchange: "rent.events"
+      RabbitMq__Enabled: "true"
+
+      STORAGE_ROOT: "/app/storage"
+    volumes:
+      - api_storage:/app/storage
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
+  api_storage:
