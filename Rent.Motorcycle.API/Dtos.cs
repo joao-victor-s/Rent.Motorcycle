@@ -80,3 +80,8 @@ public record PreviewVm(
 
 public record ReturnDto(
     [property: JsonPropertyName("data_retorno")] DateTimeOffset returnDate);
+
+
+
+public sealed record MessageDto(string mensagem);
+
